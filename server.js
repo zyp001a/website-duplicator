@@ -3,18 +3,21 @@ var http = require('http');
 var fs = require('fs');
 var path = require('path');
 var cp = require("child_process");
-var htmlparser = require("htmlparser");
 var file = require("./lib/file");
 var webreq = require("./lib/req");
 var port = 6174;
 var url = require("url");
+var op = process.argv[2];
+function strlen(str){
+  return new Buffer(str).length;
+}
 
 var prefix = "websites/";
 if(fs.existsSync("record.json")){
 	var record = fs.readFileSync("record.json");
 }
 http.createServer(function(req, res) {
-	console.log(req.url);
+	console.log("req: " + req.url);
 	var remote = convertReq(req.url, "remote");
 	if(!remote) {
 		res.writeHead(404); res.end("Please type a correct address!");
@@ -25,11 +28,12 @@ http.createServer(function(req, res) {
 	if(fs.existsSync(fname) && fs.statSync(fname).isDirectory())	
 		fname = fname + "/index.html";
   if(!cached(fname)){
+//  if(cached(fname)){
 		var dirf= path.dirname(fname);
 		if(fs.existsSync(dirf) && fs.statSync(dirf).isFile()){
 			file.mvSync(dirf, dirf+".tmp");
 			file.mkdirpSync(dirf);
-			file.mvSync(dirf + ".tmp", fdir+"/index.html");
+			file.mvSync(dirf + ".tmp", dirf+"/index.html");
 		}else{
 			file.mkdirpSync(dirf);
 		}
@@ -41,20 +45,34 @@ http.createServer(function(req, res) {
 				cookie: req.headers.cookie				
 			}
     };
+		console.log("downloading "+remote);
     webreq.ajax(config, function(err, result, info){
-			for(var key in info.headers){
-				res.setHeader(key, info.headers[key]);
-			}
-			res.writeHead(info.statusCode);
-			if(info.headers["content-type"] && info.headers["content-type"].match("image")){
+			console.log("done");
+			var ct = info.headers["content-type"];
+			if(ct && (ct.match("image") || ct.match("video"))){
+				for(var key in info.headers){
+					res.setHeader(key, info.headers[key]);
+				}
 				fs.writeFileSync(fname, result, 'binary');
-			}else{
+			}else if(ct == "text/html"){
 				result = modifyhref(result, remote);
+				for(var key in info.headers){
+					if(key.match(/content-length/i)) continue;
+					res.setHeader(key, info.headers[key]);
+				}
+				res.setHeader("content-length", strlen(result));
+				fs.writeFileSync(fname, result);
+			}else{
+				for(var key in info.headers){
+					res.setHeader(key, info.headers[key]);
+				}
 				fs.writeFileSync(fname, result);
 			}
+			res.writeHead(info.statusCode);
 			sendFile(fname, res);
     });
   }else{
+		console.log("send cache "+fname);
     sendFile(fname, res);
   }
 }).listen(port, function(err){
@@ -63,7 +81,8 @@ http.createServer(function(req, res) {
 });
 
 function cached(fname){
-//	return fs.existsSync(fname) && fs.statSync(fname).isFile();
+	if(op == "-r") return false;
+	return fs.existsSync(fname) && fs.statSync(fname).isFile();
 }
 //url converter
 function convertReq(urlx, to, method){
@@ -79,6 +98,34 @@ function convertReq(urlx, to, method){
 	}else if(to == "remote")
 		return protocol + "://" + host + apath;
 }
+
+function modifyhref(data, remote){
+
+	data = data.replace(/src=([\'\"])(\S+)([\'\"])/g, function(match, p1, p2, p3){
+		return 'src='+ p1 + getaddr(remote, p2) + p3;
+	});
+	data = data.replace(/href=([\"\'])(\S+)([\'\"])/g, function(match, p1, p2, p3){
+		return 'href='+ p1 + getaddr(remote, p2) + p3;
+	});
+
+	data = data.replace(/url\(([^\)]+)\)/g, function(match, p1){
+		return 'url(' + getaddr(remote, p1) + ')"';
+	});
+
+	return data;
+}
+function getaddr(remote, src){
+	if(src.match(/^http/)){
+		return convertUrl(src, "req");
+	}if(src.match(/^\/\//)){
+		return "/" + convertUrl(remote, "protocol") + src.substr(1);
+	}else if(src[0] == "/"){
+		return convertUrl(remote, "reqhost") + src;
+	}else{
+		return convertUrl(remote, "reqhost") + "/"+src;
+	}
+}
+
 function convertUrl(urlx, to){
 	var m = urlx.match(/^(https?):\/\/([^\/\?]+)(\S+)?/);
 	if(!m) return null;
@@ -93,33 +140,6 @@ function convertUrl(urlx, to){
 		return protocol;
 }
 
-function modifyhref(data, remote){
-
-	data = data.replace(/src=[\'\"](\S+)[\'\"]/g, function(match, p1){
-		return 'src="'+ getaddr(remote, p1) + '"';
-	});
-	data = data.replace(/href=[\"\'](\S+)[\'\"]/g, function(match, p1){
-		return 'href="'+ getaddr(remote, p1) + '"';
-	});
-
-	data = data.replace(/url\(([^\)]+)\)/g, function(match, p1){
-		return 'url(' + getaddr(remote, p1) + ')"';
-	});
-
-	return data;
-}
-function getaddr(remote, src){
-	var parsed = url.parse(remote);
-	if(src.match(/^http/)){
-		return convertUrl(src, "req");
-	}if(src.match(/^\/\//)){
-		return "/" + convertUrl(remote, "protocol") + src.substr(1);
-	}else if(src[0] == "/"){
-		return convertUrl(remote, "reqhost") + src;
-	}else{
-		return src;
-	}
-}
 function sendFile(filePath, res){
 	if(fs.existsSync(filePath)){
 		var stream = fs.createReadStream(filePath);
