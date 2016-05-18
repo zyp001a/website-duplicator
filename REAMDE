@@ -1,0 +1,7 @@
+No dependencies
+
+run it: 
+node server.js -s https://www.google.com.hk -r
+
+address: 
+http://localhost:6174/?hl=en_HK

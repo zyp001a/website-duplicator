@@ -56,7 +56,8 @@ http.createServer(function(req, res) {
 			file.mvSync(dirf + ".tmp", dirf+"/index.html");
 		}else{
 			file.mkdirpSync(dirf);
-		}
+		}	
+		console.log(req.headers.cookie);
 		var config = {
       url: remote,
       method: req.method,
