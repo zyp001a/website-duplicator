@@ -54,7 +54,7 @@ http.createServer(function(req, res) {
 					res.setHeader(key, info.headers[key]);
 				}
 				fs.writeFileSync(fname, result, 'binary');
-			}else if(ct == "text/html"){
+			}else if(ct.match("text/html")){
 				result = modifyhref(result, remote);
 				for(var key in info.headers){
 					if(key.match(/content-length/i)) continue;
@@ -90,22 +90,21 @@ function convertReq(urlx, to, method){
 	if(!m) return null;
 	var protocol = m[1];
 	var host = m[2];
+	host = host.replace(/-g-/, "www.google.com.hk");
 	var apath = m[3] || "";
 	if(to == "local"){
 		if(apath == "" || apath == "/")
 			return  prefix + protocol + "/" + host + "/" + method + "/index.html";
 		return prefix + protocol + "/" + host + "/" + method + apath.replace("?", "/?");
-	}else if(to == "remote")
+	}else if(to == "remote"){
 		return protocol + "://" + host + apath;
+	}
 }
 
 function modifyhref(data, remote){
-
-	data = data.replace(/src=([\'\"])(\S+)([\'\"])/g, function(match, p1, p2, p3){
-		return 'src='+ p1 + getaddr(remote, p2) + p3;
-	});
-	data = data.replace(/href=([\"\'])(\S+)([\'\"])/g, function(match, p1, p2, p3){
-		return 'href='+ p1 + getaddr(remote, p2) + p3;
+	
+	data = data.replace(/([a-z]+)=([\'\"])(\S+)([\'\"])/g, function(match, p1, p2, p3, p4){
+		return p1+'='+ p2 + getaddr(remote, p3) + p4;
 	});
 
 	data = data.replace(/url\(([^\)]+)\)/g, function(match, p1){
@@ -115,14 +114,15 @@ function modifyhref(data, remote){
 	return data;
 }
 function getaddr(remote, src){
+	var remotex = remote.replace(/www\.google\.com\.hk/g,"-g-");
 	if(src.match(/^http/)){
 		return convertUrl(src, "req");
 	}if(src.match(/^\/\//)){
-		return "/" + convertUrl(remote, "protocol") + src.substr(1);
+		return "/" + convertUrl(remotex, "protocol") + src.substr(1);
 	}else if(src[0] == "/"){
-		return convertUrl(remote, "reqhost") + src;
+		return convertUrl(remotex, "reqhost") + src;
 	}else{
-		return convertUrl(remote, "reqhost") + "/"+src;
+		return convertUrl(remotex, "reqhost") + "/"+src;
 	}
 }
 
