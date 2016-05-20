@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-var http = require('http');
-var fs = require('fs');
-var path = require('path');
-var cp = require("child_process");
-var file = require("./lib/file");
-var webreq = require("./lib/req");
-var port = 6174;
+var http = require("http");
+var fs = require("fs");
+var path = require("path");
+var requestx = require("./lib.js").requestx;
+var mvSync = require("./lib.js").mvSync;
+var mkdirpSync = require("./lib.js").mkdirpSync;
 var url = require("url");
+var port = 6174;
 var _nodeBin = process.argv.shift();
 var _dispBin = process.argv.shift();
 var flag_refresh = 0;
@@ -51,11 +51,11 @@ http.createServer(function(req, res) {
 		var dirf= path.dirname(fname);
 //  if(cached(fname)){
 		if(fs.existsSync(dirf) && fs.statSync(dirf).isFile()){
-			file.mvSync(dirf, dirf+".tmp");
-			file.mkdirpSync(dirf);
-			file.mvSync(dirf + ".tmp", dirf+"/index.html");
+			mvSync(dirf, dirf+".tmp");
+			mkdirpSync(dirf);
+			mvSync(dirf + ".tmp", dirf+"/index.html");
 		}else{
-			file.mkdirpSync(dirf);
+			mkdirpSync(dirf);
 		}	
 		console.log(req.headers.cookie);
 		var config = {
@@ -67,7 +67,7 @@ http.createServer(function(req, res) {
 			}
     };
 		console.log("downloading "+remote);
-    webreq.ajax(config, function(err, result, info){
+    requestx.ajax(config, function(err, result, info){
 			console.log("done");
 			var ct = info.headers["content-type"];
 			if(ct && (ct.match("image") || ct.match("video"))){
@@ -75,18 +75,13 @@ http.createServer(function(req, res) {
 					res.setHeader(key, info.headers[key]);
 				}
 				fs.writeFileSync(fname, result, 'binary');
-			}else if(ct.match("text/html")){
+			}else{
 				result = modifyhref(result, remote);
 				for(var key in info.headers){
 					if(key.match(/content-length/i)) continue;
 					res.setHeader(key, info.headers[key]);
 				}
 				res.setHeader("content-length", strlen(result));
-				fs.writeFileSync(fname, result);
-			}else{
-				for(var key in info.headers){
-					res.setHeader(key, info.headers[key]);
-				}
 				fs.writeFileSync(fname, result);
 			}
 			res.writeHead(info.statusCode);
@@ -113,7 +108,7 @@ function convertReq(urlx, to, method){
 		if(rsite){
 			var parsed = url.parse(rsite);
 			if(to == "local"){
-				file.mkdirpSync('tmp');
+				mkdirpSync('tmp');
 				return "tmp" +  urlx;
 			}
 			else if(to == "remote")
@@ -135,15 +130,9 @@ function convertReq(urlx, to, method){
 }
 
 function modifyhref(data, remote){
-
-	data = data.replace(/([a-z]+)=([\'\"])(\S+)([\'\"])/g, function(match, p1, p2, p3, p4){
+	data = data.replace(/(src|href|content)=([\'\"])(\S+)([\'\"])/g, function(match, p1, p2, p3, p4){
 		return p1+'='+ p2 + getaddr(remote, p3) + p4;
 	});
-
-	data = data.replace(/url\(([^\)]+)\)/g, function(match, p1){
-		return 'url(' + getaddr(remote, p1) + ')';
-	});
-
 	return data;
 }
 function getaddr(remote, src){
@@ -153,7 +142,9 @@ function getaddr(remote, src){
 	}
 	if(rsite) return src;
 	if(src.match(/^\/\//)){
-		return "/" + convertUrl(remote, "protocol") + src.substr(1);
+		console.log(src);
+		console.log("/" + convertUrl(remote, "reqhost") + src.substr(1))
+		return convertUrl(remote, "reqhost") + src.substr(1);
 	}
 	if(src[0] == "/"){
 		return convertUrl(remote, "reqhost") + src;

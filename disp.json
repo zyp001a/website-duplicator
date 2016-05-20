@@ -1,0 +1,7 @@
+{
+	"arch": "bin",
+	"impl": "nodejs",
+	"content": {
+		"server.js": 1
+	}
+}
