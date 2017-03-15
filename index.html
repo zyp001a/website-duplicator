@@ -1,0 +1,16 @@
+<html>
+<head>
+<script>
+function go(){
+	document.getElementById("main").src = encodeURIComponent(document.getElementById("url").value)
+}
+
+</script>
+</head>
+<body>
+<input id="url" style="width:100%">
+<button id="go" onclick="go()">Go!</button>
+<iframe id="main" style="width:100%;height:100%">
+</iframe>
+</body>
+</html>
