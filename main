@@ -1,14 +1,12 @@
 #!/usr/bin/env node
-var http = require("http");
-var fs = require("fs");
-var path = require("path");
-var requestx = require("./lib.js").requestx;
-var mvSync = require("./lib.js").mvSync;
-var mkdirpSync = require("./lib.js").mkdirpSync;
-var url = require("url");
+var http = require('http');
+var fs = require('fs');
+var path = require('path');
+var cp = require("child_process");
+var file = require("./lib/file");
+var webreq = require("./lib/req");
 var port = 6174;
-var _nodeBin = process.argv.shift();
-var _dispBin = process.argv.shift();
+var url = require("url");
 var flag_refresh = 0;
 var rsite ;
 process.on('uncaughtException', function(err) {
